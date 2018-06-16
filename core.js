@@ -3,6 +3,8 @@ window.addEventListener("load",init,false);
 function init() {
 
 	var game = new Phaser.Game("100", "100", Phaser.AUTO, "", { preload: preload, create: create });
+	let score = 0;
+	let scoreText;
 
 	let blockColors = [
 		"0xff0000",
@@ -82,11 +84,28 @@ function init() {
 				createBlock(x,y);
 			}
 		}
-	}
-
-	function update () {
 		
-
+		// Add score tally
+		scoreText = game.add.text(
+			0, 0, "Score: 0", { 
+				fontSize: "32px",
+				fill: "#fff",
+				boundsAlignH: "right"
+			}
+		);
+		scoreText.setTextBounds(16, 16, window.innerWidth - 32, window.innerHeight - 32);
+		
+		// Add game over text
+		gameOverText = game.add.text(
+			0, 0, "GAME\nOVER", { 
+				fontSize: "64px",
+				fill: "#fff",
+				boundsAlignH: "center",
+				boundsAlignV: "center"
+			}
+		);
+		gameOverText.visible = false;
+		gameOverText.setTextBounds(16, 16, window.innerWidth - 32, window.innerHeight - 32);
 	}
 	
 	function createBlock (x,y) {
@@ -129,8 +148,14 @@ function init() {
 			}
 		}
 		block.meta.removeConnected = function(){
+			score += this.checks.length*config.game.score.pointsPerBlock;
+			if (this.checks.length >= config.game.score.bonusTreshold){
+				score += config.game.score.bonusPoints;
+			}
+			scoreText.text = 'Score: ' + score;
+			
 			for (let i = 0; i < this.checks.length; i++){
-				var block = mainGroup.meta.lookupArray[ this.checks[i].x ][ this.checks[i].y ];
+				let block = mainGroup.meta.lookupArray[ this.checks[i].x ][ this.checks[i].y ];
 				/* console.log(block); */
 				mainGroup.meta.lookupArray[ this.checks[i].x ][ this.checks[i].y ] = null;
 				block.destroy();
@@ -149,11 +174,13 @@ function init() {
 		// Input
 		block.inputEnabled = true;
 		block.events.onInputDown.add(function(object){ // On click
+			console.log(object);
 			object.meta.checks = [];
 			object.meta.checkAround(object);
 			if (object.meta.checks.length >= config.game.minimumConnected){ // Make sure there are same colored blocks connected
 				object.meta.removeConnected();
 				checkForEmptyColumns();
+				checkForGameOver();
 			}
 		}, this);
 		
@@ -169,7 +196,6 @@ function init() {
 	}
 	
 	function checkColumn(col){
-		console.log("-----------------------",col);
 		
 		let dropDistance = 0;
 		let newArray = []; // Create a new array to replace 
@@ -200,18 +226,33 @@ function init() {
 				
 				for (let r = i; r < mainGroup.meta.lookupArray.length; r++){ // Move blocks to the left
 					mainGroup.meta.lookupArray[r].map((b) => {
-						console.log(b);
 						if (b != null){
-							b.x = b.x - blockSize;
-							b.meta.x--;
+							b.x = b.x - blockSize; // Move visually
+							b.meta.x--; // Update meta
 						}
 					});
 				}
 				mainGroup.meta.lookupArray.push( nullColumn() ); // Add empty column at the end
-				
-				console.log(mainGroup.meta.lookupArray);
 			}
 		}	
+	}
+	
+	function checkForGameOver(){
+		for (let x = 0; x < config.game.grid.width; x++){
+			for (let y = 0; y < config.game.grid.height; y++){
+				var block = mainGroup.meta.lookupArray[x][y];
+				if (block != null){
+					block.meta.checks = [];
+					block.meta.checkAround(block);
+					if (block.meta.checks.length >= config.game.minimumConnected){
+						return;
+					}
+				}
+			}
+		}
+		// If function has not returned yet, the game is over
+		console.log("Game over");
+		gameOverText.visible = true;
 	}
 };
 
