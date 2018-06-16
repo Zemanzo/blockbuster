@@ -75,11 +75,6 @@ function init() {
 		console.log(mainGroup);
 		mainGroup.meta = {};
 		mainGroup.meta.lookupArray = generateLookupArray();
-		for (let i = 0; i < colorIndices.length; i++){
-			colorGroups.push(new Phaser.Group(game));
-			colorGroups[i].meta = {};
-			colorGroups[i].meta.lookupArray = generateLookupArray();
-		}
 		
 		// Add blocks
 		for (let x = 0; x < config.game.grid.width; x++){
@@ -123,21 +118,21 @@ function init() {
 				[x+1, y] // East
 			];
 			
-			for (dir of directions){
+			for (let dir of directions){
 				if ( 
 					!isOOB(dir[0],dir[1]) && 
-					colorGroups[this.groupIndex].meta.lookupArray[ dir[0] ][ dir[1] ] != null
+					mainGroup.meta.lookupArray[ dir[0] ][ dir[1] ] != null &&
+					mainGroup.meta.lookupArray[ dir[0] ][ dir[1] ].meta.groupIndex == this.groupIndex
 				) {
-					colorGroups[this.groupIndex].meta.lookupArray[ dir[0] ][ dir[1] ].meta.checkAround(caller);
+					mainGroup.meta.lookupArray[ dir[0] ][ dir[1] ].meta.checkAround(caller);
 				}
 			}
 		}
 		block.meta.removeConnected = function(){
 			for (let i = 0; i < this.checks.length; i++){
-				var block = colorGroups[this.groupIndex].meta.lookupArray[ this.checks[i].x ][ this.checks[i].y ];
-				console.log(block);
+				var block = mainGroup.meta.lookupArray[ this.checks[i].x ][ this.checks[i].y ];
+				/* console.log(block); */
 				mainGroup.meta.lookupArray[ this.checks[i].x ][ this.checks[i].y ] = null;
-				colorGroups[this.groupIndex].meta.lookupArray[ this.checks[i].x ][ this.checks[i].y ] = null;
 				block.destroy();
 			}
 			
@@ -156,15 +151,15 @@ function init() {
 		block.events.onInputDown.add(function(object){ // On click
 			object.meta.checks = [];
 			object.meta.checkAround(object);
-			if (object.meta.checks.length >= config.game.minimumConnected) // Make sure there are same colored blocks connected
+			if (object.meta.checks.length >= config.game.minimumConnected){ // Make sure there are same colored blocks connected
 				object.meta.removeConnected();
+				checkForEmptyColumns();
+			}
 		}, this);
 		
-		// Add it to groups
+		// Add it to group
 		mainGroup.add(block)
 		mainGroup.meta.lookupArray[x][y] = block;
-		colorGroups[block.meta.groupIndex].add(block);
-		colorGroups[block.meta.groupIndex].meta.lookupArray[x][y] = block;
 			
 	}
 	
@@ -175,49 +170,49 @@ function init() {
 	
 	function checkColumn(col){
 		console.log("-----------------------",col);
-		if ( mainGroup.meta.lookupArray[col].every( el => el == null ) ){ // If column is completely empty
-			
-			console.log("column empty :o");
-			
-			/* mainGroup.meta.lookupArray.splice(col,1);
-			mainGroup.meta.lookupArray.push( [].fill(null,0,config.game.grid.height) );
-			for (let i = col; i < config.game.grid.width; i++){
-				mainGroup.meta.lookupArray[i].map(x => x = x - blockSize);
-			} */
-			
-		} else {
-			let dropDistance = 0;
-			let newArray = []; // Create a new array to replace 
-			for (let row = mainGroup.meta.lookupArray[col].length - 1; row >= 0; row--){
-				let block = mainGroup.meta.lookupArray[col][row];
-				if (block != null){
-					block.position.y = block.position.y + dropDistance*blockSize;
-					block.meta.y = block.meta.y + dropDistance;
-					newArray.push(block);
-				} else {
-					dropDistance++;
-				}
-			}
-			for (d = 0; d < dropDistance; d++){
-				newArray.push(null);
-			}
-			newArray.reverse();
-			
-			mainGroup.meta.lookupArray[col] = newArray;
-			
-			for (group of colorGroups){
-				group.meta.lookupArray[col].fill(null,0,config.game.grid.height);
-			}
-			
-			let row = 0;
-			for (block of mainGroup.meta.lookupArray[col]){
-				if (block != null)
-					colorGroups[block.meta.groupIndex].meta.lookupArray[col][row] = block;
-				row++;
+		
+		let dropDistance = 0;
+		let newArray = []; // Create a new array to replace 
+		for (let row = mainGroup.meta.lookupArray[col].length - 1; row >= 0; row--){
+			let block = mainGroup.meta.lookupArray[col][row];
+			if (block != null){
+				block.position.y = block.position.y + dropDistance*blockSize;
+				block.meta.y = block.meta.y + dropDistance;
+				newArray.push(block);
+			} else {
+				dropDistance++;
 			}
 		}
+		for (let d = 0; d < dropDistance; d++){
+			newArray.push(null);
+		}
+		newArray.reverse();
+		
+		mainGroup.meta.lookupArray[col] = newArray;
 	}
-
+	
+	function checkForEmptyColumns(){
+		let emptyColumns = [];
+		for (let i = mainGroup.meta.lookupArray.length - 1; i >= 0 ; i--){ // Go through columns in reverse order
+			if ( mainGroup.meta.lookupArray[i][config.game.grid.height-1] == null ){ // If last object in array is null, column is empty
+			
+				mainGroup.meta.lookupArray.splice(i,1); // Remove column
+				
+				for (let r = i; r < mainGroup.meta.lookupArray.length; r++){ // Move blocks to the left
+					mainGroup.meta.lookupArray[r].map((b) => {
+						console.log(b);
+						if (b != null){
+							b.x = b.x - blockSize;
+							b.meta.x--;
+						}
+					});
+				}
+				mainGroup.meta.lookupArray.push( nullColumn() ); // Add empty column at the end
+				
+				console.log(mainGroup.meta.lookupArray);
+			}
+		}	
+	}
 };
 
 function generateLookupArray(){
@@ -229,4 +224,11 @@ function generateLookupArray(){
 		}
 	}
 	return arr;
+}
+
+function nullColumn(){
+	let c = [];
+	c[config.game.grid.height - 1] = null;
+	c.fill(null,0,config.game.grid.height);
+	return c;
 }
