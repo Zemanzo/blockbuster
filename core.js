@@ -126,6 +126,7 @@ function init() {
 				}
 			}
 		}
+
 		block.meta.removeConnected = function(){
 			score += this.checks.length*config.game.score.pointsPerBlock;
 			if (this.checks.length >= config.game.score.bonusTreshold){
@@ -138,9 +139,12 @@ function init() {
 				/* console.log(block); */
 				mainGroup.meta.lookupArray[ this.checks[i].x ][ this.checks[i].y ] = null;
 				block.animations.play("vanish",60,false);
-				block.events.onAnimationComplete.add(function(){
+				/* block.events.onAnimationComplete.add(function(){
 					block.destroy();
-				});
+				}); */
+				setTimeout(function(){
+					block.destroy();
+				},600);
 			}
 			
 			setTimeout(function(){ // Waiting for animation to end
@@ -151,7 +155,7 @@ function init() {
 				checkForEmptyColumns();
 				checkForGameOver();
 				allowInput = true;
-			},600);
+			},650);
 		}
 		
 		// Attributes
