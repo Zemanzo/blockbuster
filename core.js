@@ -1,10 +1,12 @@
 window.addEventListener("load",init,false);
 
+let allowInput;
 function init() {
 
 	var game = new Phaser.Game("100", "100", Phaser.AUTO, "", { preload: preload, create: create });
 	let score = 0;
 	let scoreText;
+	allowInput = true;
 
 	let blockColors = [
 		"0xff0000",
@@ -31,38 +33,12 @@ function init() {
 	
 	function preload () {
 
-		game.load.image("block", "assets/sprites/block-grayscale.png");
+		game.load.spritesheet("block", "assets/sprites/block-grayscale-sheet.png",128,128,27);
 		game.load.image("gridTile", "assets/sprites/gridtile.png");
 
 	}
 
 	function create () {
-		
-		/* // Create grid
-		var grid = game.add.tilemap(
-			null,
-			blockSize,
-			blockSize,
-			config.game.grid.width,
-			config.game.grid.height
-		);
-		
-		grid.addTilesetImage("gridTiles","gridTile",128,128);
-		var layer = grid.create(
-			"gridLayer",
-			config.game.grid.width,
-			config.game.grid.height,
-			blockSize,
-			blockSize
-		);
-		
-		grid.fill(0,0,0,config.game.grid.width,config.game.grid.height); */
-		
-		/* if (window.innerWidth > window.innerHeight){ // Landscape
-			
-		} else { // Portrait
-			
-		} */
 		
 		// Decide color lookup table
 		for (let i = 0; i < config.game.colors; i++){
@@ -111,6 +87,9 @@ function init() {
 	function createBlock (x,y) {
 		let block = game.add.sprite(x * blockSize, y * blockSize, "block");
 		
+		// Add animation
+		block.animations.add('vanish');
+		
 		// Custom attributes
 		block.meta = {};
 		block.meta.x = x; // Tile position
@@ -134,7 +113,7 @@ function init() {
 				[x, y-1], // North
 				[x, y+1], // South
 				[x-1, y], // West
-				[x+1, y] // East
+				[x+1, y]  // East
 			];
 			
 			for (let dir of directions){
@@ -158,12 +137,21 @@ function init() {
 				let block = mainGroup.meta.lookupArray[ this.checks[i].x ][ this.checks[i].y ];
 				/* console.log(block); */
 				mainGroup.meta.lookupArray[ this.checks[i].x ][ this.checks[i].y ] = null;
-				block.destroy();
+				block.animations.play("vanish",60,false);
+				block.events.onAnimationComplete.add(function(){
+					block.destroy();
+				});
 			}
 			
-			for (let col = 0; col < config.game.grid.width; col++){
-				checkColumn(col);
-			}
+			setTimeout(function(){ // Waiting for animation to end
+				for (let col = 0; col < config.game.grid.width; col++){
+					checkColumn(col);
+				}
+				
+				checkForEmptyColumns();
+				checkForGameOver();
+				allowInput = true;
+			},600);
 		}
 		
 		// Attributes
@@ -175,12 +163,15 @@ function init() {
 		block.inputEnabled = true;
 		block.events.onInputDown.add(function(object){ // On click
 			console.log(object);
-			object.meta.checks = [];
-			object.meta.checkAround(object);
-			if (object.meta.checks.length >= config.game.minimumConnected){ // Make sure there are same colored blocks connected
-				object.meta.removeConnected();
-				checkForEmptyColumns();
-				checkForGameOver();
+			if (allowInput){
+				allowInput = false;
+				object.meta.checks = [];
+				object.meta.checkAround(object);
+				if (object.meta.checks.length >= config.game.minimumConnected){ // Make sure there are same colored blocks connected
+					object.meta.removeConnected();
+				} else {
+					allowInput = true;
+				}
 			}
 		}, this);
 		
